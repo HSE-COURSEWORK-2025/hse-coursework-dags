@@ -1,12 +1,11 @@
 import os
 import json
 import requests
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
-from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.exceptions import AirflowException
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
 # Читаем базовые URL из переменных окружения (подгружаются через ConfigMap / Secrets)
 DATA_COLLECTION_API_BASE_URL = os.getenv(
@@ -54,30 +53,32 @@ def fetch_all_users_and_data_dag():
             users = resp.json()
             if not users:
                 raise AirflowException("No users found in the response")
-            # Преобразуем в список для динамического маппинга
+            # Преобразуем в список JSON-строк для динамического маппинга
             return [json.dumps(u, ensure_ascii=False) for u in users]
         except Exception as e:
             raise AirflowException(f"API request failed: {e}")
 
     users = fetch_users()
 
-    (KubernetesPodOperator
-        .partial(
-            namespace="airflow",
-            image="fetch_users:latest",
-            cmds=["python", "-m", "your_module_main"],  # замените на реальную команду внутри образа
-            env_vars={
-                "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
-                "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
-                "PYTHONUNBUFFERED": "1",
-            },
-            get_logs=True,
-            is_delete_operator_pod=True,
-        )
-        .expand(
-            name=[f"process_user_{json.loads(payload)['email'].replace('@', '_at_')}" for payload in users],
-            arguments=[["--user-json", payload] for payload in users],
-        )
+    # Параметры общего Pod оператора с указанием обязательного task_id
+    pod_op = KubernetesPodOperator.partial(
+        task_id="process_user",
+        namespace="airflow",
+        image="fetch_users:latest",
+        cmds=["python", "-m", "your_module_main"],  # замените на реальную команду внутри образа
+        env_vars={
+            "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
+            "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
+            "PYTHONUNBUFFERED": "1",
+        },
+        get_logs=True,
+        is_delete_operator_pod=True,
     )
+
+    pod_op.expand(
+        task_id=[f"process_user_{json.loads(payload)['email'].replace('@', '_at_')}" for payload in users],
+        arguments=[["--user-json", payload] for payload in users],
+    )
+
 
 dag_instance = fetch_all_users_and_data_dag()
