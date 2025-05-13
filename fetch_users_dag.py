@@ -61,24 +61,23 @@ def fetch_all_users_and_data_dag():
     users = fetch_users()
 
     # Параметры общего Pod оператора с обязательным task_id (шаблон)
-    pod_op = KubernetesPodOperator.partial(
-        task_id="process_user",  # базовый task_id, к которому добавится суффикс
+    base_op = KubernetesPodOperator.partial(
         namespace="airflow",
         image="fetch_users:latest",
-        cmds=["python3", "run.py"],  # замените на реальную команду внутри образа
-        env_vars={
-            "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
-            "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
-            "PYTHONUNBUFFERED": "1",
-        },
-        arguments=["--user-json", "{{ ti.xcom_pull(task_ids='fetch_users')[index] }}"],
+        cmds=["python", "-m", "your_module_main"],  # замените на реальную команду внутри образа
         get_logs=True,
         is_delete_operator_pod=True,
     )
 
-    # Динамический массив аргументов для каждого XCom значения
-    pod_op.expand(
-        index=range(len(users))
+    # Динамическое маппинг: создаём для каждого пользователя свой pod
+    base_op.expand(
+        task_id=users.map(lambda u: f"process_user_{json.loads(u)['email'].replace('@', '_at_')}"),
+        env_vars=users.map(lambda u: {
+            "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
+            "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
+            "PYTHONUNBUFFERED": "1",
+        }),
+        arguments=users.map(lambda u: ["--user-json", u]),
     )
 
 
