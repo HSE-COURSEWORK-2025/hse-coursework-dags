@@ -1,11 +1,16 @@
 import os
 import json
 import requests
+import logging
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+
+# Настраиваем логгер
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Читаем базовые URL из переменных окружения (подгружаются через ConfigMap / Secrets)
 DATA_COLLECTION_API_BASE_URL = os.getenv(
@@ -25,8 +30,8 @@ AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2025, 4, 1),
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
+    "retries": 2,
+    "retry_delay": timedelta(minutes=2),
     "execution_timeout": timedelta(minutes=60),
 }
 
@@ -40,27 +45,31 @@ default_args = {
 )
 def fetch_all_users_and_data_dag():
     def _url(path: str) -> str:
-        if path.startswith("/auth-api"):
-            return f"{AUTH_API_BASE_URL}{path}"
-        return f"{DATA_COLLECTION_API_BASE_URL}{path}"
+        full = f"{AUTH_API_BASE_URL if path.startswith('/auth-api') else DATA_COLLECTION_API_BASE_URL}{path}"
+        logger.info(f"Constructed URL: %s", full)
+        return full
 
     @task(retries=2)
     def fetch_users():
         url = _url(AUTH_API_FETCH_ALL_USERS_PATH)
+        logger.info("Fetching users from URL: %s", url)
         try:
             resp = requests.get(url, timeout=10)
+            logger.info("Received response: status=%s, body=%s", resp.status_code, resp.text[:200])
             resp.raise_for_status()
             users = resp.json()
+            logger.info("Parsed %d users", len(users) if isinstance(users, list) else 0)
             if not users:
                 raise AirflowException("No users found in the response")
             # Возвращаем список JSON-строк для динамического маппинга
             return [json.dumps(u, ensure_ascii=False) for u in users]
         except Exception as e:
+            logger.error("Error fetching users: %s", str(e), exc_info=True)
             raise AirflowException(f"API request failed: {e}")
 
     users = fetch_users()
 
-    # Базовый Pod оператор с task_id, который будет модифицирован автоматически при маппинге
+    # Базовый Pod оператор
     base_op = KubernetesPodOperator.partial(
         task_id="process_user",
         namespace="airflow",
@@ -70,7 +79,7 @@ def fetch_all_users_and_data_dag():
         is_delete_operator_pod=True,
     )
 
-    # Динамическое маппинг: создаём для каждого пользователя свой pod
+    # Динамический маппинг: создаём для каждого пользователя свой pod
     base_op.expand(
         env_vars=users.map(lambda u: {
             "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
