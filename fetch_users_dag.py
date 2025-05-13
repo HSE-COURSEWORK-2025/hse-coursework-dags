@@ -53,31 +53,32 @@ def fetch_all_users_and_data_dag():
             users = resp.json()
             if not users:
                 raise AirflowException("No users found in the response")
-            # Преобразуем в список JSON-строк для динамического маппинга
+            # Возвращаем список JSON-строк для динамического маппинга
             return [json.dumps(u, ensure_ascii=False) for u in users]
         except Exception as e:
             raise AirflowException(f"API request failed: {e}")
 
     users = fetch_users()
 
-    # Параметры общего Pod оператора с указанием обязательного task_id
+    # Параметры общего Pod оператора с обязательным task_id (шаблон)
     pod_op = KubernetesPodOperator.partial(
-        task_id="process_user",
+        task_id="process_user",  # базовый task_id, к которому добавится суффикс
         namespace="airflow",
         image="fetch_users:latest",
-        cmds=["python", "-m", "your_module_main"],  # замените на реальную команду внутри образа
+        cmds=["python3", "run.py"],  # замените на реальную команду внутри образа
         env_vars={
             "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
             "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
             "PYTHONUNBUFFERED": "1",
         },
+        arguments=["--user-json", "{{ ti.xcom_pull(task_ids='fetch_users')[index] }}"],
         get_logs=True,
         is_delete_operator_pod=True,
     )
 
+    # Динамический массив аргументов для каждого XCom значения
     pod_op.expand(
-        task_id=[f"process_user_{json.loads(payload)['email'].replace('@', '_at_')}" for payload in users],
-        arguments=[["--user-json", payload] for payload in users],
+        index=range(len(users))
     )
 
 
