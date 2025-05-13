@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.exceptions import AirflowException
 
 # Читаем базовые URL из переменных окружения (подгружаются через ConfigMap / Secrets)
