@@ -60,17 +60,19 @@ def fetch_all_users_and_data_dag():
 
     users = fetch_users()
 
-    # Параметры общего Pod оператора с обязательным task_id (шаблон)
+    # Параметры общего Pod оператора с обязательным task_id
     base_op = KubernetesPodOperator.partial(
+        task_id="process_user_base",
         namespace="airflow",
         image="fetch_users:latest",
-        cmds=["python", "-m", "your_module_main"],  # замените на реальную команду внутри образа
+        cmds=["python3", "run.py"],  # точка входа из Dockerfile
         get_logs=True,
         is_delete_operator_pod=True,
     )
 
     # Динамическое маппинг: создаём для каждого пользователя свой pod
     base_op.expand(
+        # переопределяем task_id для каждого instance
         task_id=users.map(lambda u: f"process_user_{json.loads(u)['email'].replace('@', '_at_')}"),
         env_vars=users.map(lambda u: {
             "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
