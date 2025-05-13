@@ -77,6 +77,7 @@ def fetch_all_users_and_data_dag():
         cmds=["python3", "run.py"],  # точка входа из Dockerfile
         get_logs=True,
         is_delete_operator_pod=True,
+        image_pull_policy='Never',
     )
 
     # Динамический маппинг: создаём для каждого пользователя свой pod
