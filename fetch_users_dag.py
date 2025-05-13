@@ -72,7 +72,7 @@ def fetch_all_users_and_data_dag():
     # Базовый Pod оператор
     base_op = KubernetesPodOperator.partial(
         task_id="process_user",
-        namespace="airflow",
+        namespace="hse-coursework-health",
         image="fetch_users:latest",
         cmds=["python3", "run.py"],  # точка входа из Dockerfile
         get_logs=True,
