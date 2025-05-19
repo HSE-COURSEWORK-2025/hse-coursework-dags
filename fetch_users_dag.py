@@ -15,11 +15,11 @@ logger.setLevel(logging.INFO)
 # Читаем базовые URL из переменных окружения (подгружаются через ConfigMap / Secrets)
 DATA_COLLECTION_API_BASE_URL = os.getenv(
     "DATA_COLLECTION_API_BASE_URL",
-    "http://192.168.0.180:8082"
+    "http://data-collection-api:8082"
 )
 AUTH_API_BASE_URL = os.getenv(
     "AUTH_API_BASE_URL",
-    "http://192.168.0.180:8081"
+    "http://auth-api:8081"
 )
 AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
     "AUTH_API_FETCH_ALL_USERS_PATH",
