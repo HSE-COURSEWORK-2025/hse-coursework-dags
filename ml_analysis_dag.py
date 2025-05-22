@@ -36,14 +36,14 @@ default_args = {
 }
 
 @dag(
-    dag_id="find_outliers_k8s",
+    dag_id="ml_analysis_k8s",
     default_args=default_args,
     schedule_interval=os.getenv("CRON_SCHEDULE_CHANNEL_DATA_UPDATE", "0 * * * *"),
     catchup=False,
     max_active_runs=1,
     tags=["user_processing", "kubernetes"],
 )
-def fetch_all_users_and_data_dag():
+def ml_analysis_dag():
     ...
 
-dag_instance = fetch_all_users_and_data_dag()
+dag_instance = ml_analysis_dag()
