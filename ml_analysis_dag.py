@@ -24,7 +24,7 @@ default_args = {
 }
 
 @dag(
-    dag_id="predict_risks_per_user_k8s",
+    dag_id="ml_analysis_k8s",
     default_args=default_args,
     schedule_interval=os.getenv("CRON_SCHEDULE_RISK_PREDICTION", "30 * * * *"),
     catchup=False,
