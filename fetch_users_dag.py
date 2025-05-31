@@ -12,7 +12,7 @@ from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperato
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Читаем базовые URL из переменных окружения (подгружаются через ConfigMap / Secrets)
+# Читаем базовые URL из переменных окружения
 DATA_COLLECTION_API_BASE_URL = os.getenv(
     "DATA_COLLECTION_API_BASE_URL",
     "http://data-collection-api:8082"
@@ -41,12 +41,13 @@ default_args = {
     schedule_interval=os.getenv("CRON_SCHEDULE_CHANNEL_DATA_UPDATE", "0 * * * *"),
     catchup=False,
     max_active_runs=1,
+    concurrency=1,       # <-- ограничиваем параллельные TI внутри этого DAG двумя
     tags=["user_processing", "kubernetes"],
 )
 def fetch_all_users_and_data_dag():
     def _url(path: str) -> str:
         full = f"{AUTH_API_BASE_URL if path.startswith('/auth-api') else DATA_COLLECTION_API_BASE_URL}{path}"
-        logger.info(f"Constructed URL: %s", full)
+        logger.info("Constructed URL: %s", full)
         return full
 
     @task(retries=2)
@@ -61,7 +62,7 @@ def fetch_all_users_and_data_dag():
             logger.info("Parsed %d users", len(users) if isinstance(users, list) else 0)
             if not users:
                 raise AirflowException("No users found in the response")
-            # Возвращаем список JSON-строк для динамического маппинга
+            # Возвращаем список JSON-строк
             return [json.dumps(u, ensure_ascii=False) for u in users]
         except Exception as e:
             logger.error("Error fetching users: %s", str(e), exc_info=True)
@@ -69,18 +70,17 @@ def fetch_all_users_and_data_dag():
 
     users = fetch_users()
 
-    # Базовый Pod оператор
     base_op = KubernetesPodOperator.partial(
         task_id="process_user",
         namespace="hse-coursework-health",
         image="fetch_users:latest",
-        cmds=["python3", "run.py"],  # точка входа из Dockerfile
+        cmds=["python3", "run.py"], 
         get_logs=True,
         is_delete_operator_pod=True,
-        image_pull_policy='Never',
+        image_pull_policy="Never",
+        # можно задать любые другие параметры Pod’а здесь
     )
 
-    # Динамический маппинг: создаём для каждого пользователя свой pod
     base_op.expand(
         env_vars=users.map(lambda u: {
             "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
@@ -89,6 +89,5 @@ def fetch_all_users_and_data_dag():
         }),
         arguments=users.map(lambda u: ["--user-json", u]),
     )
-
 
 dag_instance = fetch_all_users_and_data_dag()
