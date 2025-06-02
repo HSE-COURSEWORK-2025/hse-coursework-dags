@@ -29,7 +29,7 @@ AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
 # Общие аргументы DAG
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2025, 4, 1),
+    "start_date": datetime(2025, 6, 1),
     "retries": 2,
     "retry_delay": timedelta(minutes=2),
     "execution_timeout": timedelta(minutes=60),
@@ -38,7 +38,7 @@ default_args = {
 @dag(
     dag_id="fetch_all_users_and_data_k8s",
     default_args=default_args,
-    schedule_interval=os.getenv("CRON_SCHEDULE_CHANNEL_DATA_UPDATE", "0 * * * *"),
+    schedule_interval="0 * * * *",
     catchup=False,
     max_active_runs=1,
     concurrency=1,       # <-- ограничиваем параллельные TI внутри этого DAG двумя
