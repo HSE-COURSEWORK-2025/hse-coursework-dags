@@ -31,6 +31,7 @@ default_args = {
     schedule_interval="0 * * * *",
     catchup=False,
     max_active_runs=1,
+    concurrency=1,
     tags=["user_processing", "kubernetes"],
 )
 def find_outliers_per_user_dag():

@@ -29,6 +29,7 @@ default_args = {
     schedule_interval="0 * * * *",
     catchup=False,
     max_active_runs=1,
+    concurrency=1,
     tags=["ml", "kubernetes"],
 )
 def predict_risks_per_user_dag():
