@@ -17,7 +17,7 @@ AUTH_API_FETCH_ALL_USERS_PATH= os.getenv("AUTH_API_FETCH_ALL_USERS_PATH",
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2025, 4, 1),
+    "start_date": datetime(2025, 6, 1),
     "retries": 2,
     "retry_delay": timedelta(minutes=2),
     "execution_timeout": timedelta(minutes=60),
@@ -26,7 +26,7 @@ default_args = {
 @dag(
     dag_id="ml_analysis_k8s",
     default_args=default_args,
-    schedule_interval=os.getenv("CRON_SCHEDULE_RISK_PREDICTION", "30 * * * *"),
+    schedule_interval="0 * * * *",
     catchup=False,
     max_active_runs=1,
     tags=["ml", "kubernetes"],
