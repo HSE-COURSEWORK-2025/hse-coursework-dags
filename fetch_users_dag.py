@@ -23,7 +23,7 @@ AUTH_API_BASE_URL = os.getenv(
 )
 AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
     "AUTH_API_FETCH_ALL_USERS_PATH",
-    "/auth-api/api/v1/internal/users/get_all_users"
+    "/auth-api/api/v1/internal/users/get_all_users?test_users=false&real_users=true"
 )
 
 # Общие аргументы DAG
