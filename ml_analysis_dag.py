@@ -13,7 +13,7 @@ logger.setLevel(logging.INFO)
 DATA_COLLECTION_API_BASE_URL = os.getenv("DATA_COLLECTION_API_BASE_URL", "http://data-collection-api:8082")
 AUTH_API_BASE_URL            = os.getenv("AUTH_API_BASE_URL", "http://auth-api:8081")
 AUTH_API_FETCH_ALL_USERS_PATH= os.getenv("AUTH_API_FETCH_ALL_USERS_PATH",
-                                        "/auth-api/api/v1/internal/users/get_all_users")
+                                        "/auth-api/api/v1/internal/users/get_all_users?test_users=true")
 
 default_args = {
     "owner": "airflow",
