@@ -19,7 +19,7 @@ AUTH_API_FETCH_ALL_USERS_PATH = os.getenv("AUTH_API_FETCH_ALL_USERS_PATH", "/aut
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2025, 6, 1),
+    "start_date": datetime(2025, 6, 17),
     "retries": 2,
     "retry_delay": timedelta(minutes=2),
     "execution_timeout": timedelta(minutes=60),
