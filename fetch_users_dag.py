@@ -8,25 +8,18 @@ from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
-# Настраиваем логгер
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Читаем базовые URL из переменных окружения
 DATA_COLLECTION_API_BASE_URL = os.getenv(
-    "DATA_COLLECTION_API_BASE_URL",
-    "http://data-collection-api:8082"
+    "DATA_COLLECTION_API_BASE_URL", "http://data-collection-api:8082"
 )
-AUTH_API_BASE_URL = os.getenv(
-    "AUTH_API_BASE_URL",
-    "http://auth-api:8081"
-)
+AUTH_API_BASE_URL = os.getenv("AUTH_API_BASE_URL", "http://auth-api:8081")
 AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
     "AUTH_API_FETCH_ALL_USERS_PATH",
-    "/auth-api/api/v1/internal/users/get_all_users?test_users=false&real_users=true"
+    "/auth-api/api/v1/internal/users/get_all_users?test_users=false&real_users=true",
 )
 
-# Общие аргументы DAG
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2025, 6, 17),
@@ -35,13 +28,14 @@ default_args = {
     "execution_timeout": timedelta(minutes=60),
 }
 
+
 @dag(
     dag_id="fetch_all_users_and_data_k8s",
     default_args=default_args,
     schedule_interval="0 * * * *",
     catchup=False,
     max_active_runs=1,
-    concurrency=1,       # <-- ограничиваем параллельные TI внутри этого DAG двумя
+    concurrency=1,
     tags=["user_processing", "kubernetes"],
 )
 def fetch_all_users_and_data_dag():
@@ -56,13 +50,17 @@ def fetch_all_users_and_data_dag():
         logger.info("Fetching users from URL: %s", url)
         try:
             resp = requests.get(url, timeout=10)
-            logger.info("Received response: status=%s, body=%s", resp.status_code, resp.text[:200])
+            logger.info(
+                "Received response: status=%s, body=%s",
+                resp.status_code,
+                resp.text[:200],
+            )
             resp.raise_for_status()
             users = resp.json()
             logger.info("Parsed %d users", len(users) if isinstance(users, list) else 0)
             if not users:
                 raise AirflowException("No users found in the response")
-            # Возвращаем список JSON-строк
+
             return [json.dumps(u, ensure_ascii=False) for u in users]
         except Exception as e:
             logger.error("Error fetching users: %s", str(e), exc_info=True)
@@ -74,20 +72,22 @@ def fetch_all_users_and_data_dag():
         task_id="process_user",
         namespace="hse-coursework-health",
         image="fetch_users:latest",
-        cmds=["python3", "run.py"], 
+        cmds=["python3", "run.py"],
         get_logs=True,
         is_delete_operator_pod=True,
         image_pull_policy="Never",
-        # можно задать любые другие параметры Pod’а здесь
     )
 
     base_op.expand(
-        env_vars=users.map(lambda u: {
-            "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
-            "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
-            "PYTHONUNBUFFERED": "1",
-        }),
+        env_vars=users.map(
+            lambda u: {
+                "DATA_COLLECTION_API_BASE_URL": DATA_COLLECTION_API_BASE_URL,
+                "AUTH_API_BASE_URL": AUTH_API_BASE_URL,
+                "PYTHONUNBUFFERED": "1",
+            }
+        ),
         arguments=users.map(lambda u: ["--user-json", u]),
     )
+
 
 dag_instance = fetch_all_users_and_data_dag()

@@ -8,14 +8,17 @@ from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
-# Логгер
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Конфиги
-DATA_COLLECTION_API_BASE_URL = os.getenv("DATA_COLLECTION_API_BASE_URL", "http://data-collection-api:8082")
+DATA_COLLECTION_API_BASE_URL = os.getenv(
+    "DATA_COLLECTION_API_BASE_URL", "http://data-collection-api:8082"
+)
 AUTH_API_BASE_URL = os.getenv("AUTH_API_BASE_URL", "http://auth-api:8081")
-AUTH_API_FETCH_ALL_USERS_PATH = os.getenv("AUTH_API_FETCH_ALL_USERS_PATH", "/auth-api/api/v1/internal/users/get_all_users?test_users=true&real_users=true")
+AUTH_API_FETCH_ALL_USERS_PATH = os.getenv(
+    "AUTH_API_FETCH_ALL_USERS_PATH",
+    "/auth-api/api/v1/internal/users/get_all_users?test_users=true&real_users=true",
+)
 
 default_args = {
     "owner": "airflow",
@@ -24,6 +27,7 @@ default_args = {
     "retry_delay": timedelta(minutes=2),
     "execution_timeout": timedelta(minutes=60),
 }
+
 
 @dag(
     dag_id="find_outliers_per_user_k8s",
@@ -46,7 +50,7 @@ def find_outliers_per_user_dag():
         users = resp.json()
         if not isinstance(users, list) or not users:
             raise AirflowException("No users found")
-        # возвращаем список email’ов
+
         return [u["email"] for u in users if "email" in u]
 
     @task
@@ -57,13 +61,10 @@ def find_outliers_per_user_dag():
         """
         return [["--email", email] for email in emails]
 
-    # 1) Получаем XComArg со списком email’ов
     user_emails = fetch_users()
 
-    # 2) Строим XComArg со списком аргументов
     args_list = build_args(user_emails)
 
-    # 3) Запускаем один pod на каждый элемент args_list
     KubernetesPodOperator.partial(
         task_id="find_outliers",
         namespace="hse-coursework-health",
@@ -72,8 +73,7 @@ def find_outliers_per_user_dag():
         get_logs=True,
         is_delete_operator_pod=True,
         image_pull_policy="Never",
-    ).expand(
-        arguments=args_list
-    )
+    ).expand(arguments=args_list)
+
 
 dag_instance = find_outliers_per_user_dag()
